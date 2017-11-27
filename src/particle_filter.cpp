@@ -26,7 +26,7 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
 	// NOTE: Consult particle_filter.h for more information about this method (and others in this file).
     
     // set number of particles
-    this->num_particles = 50;
+    this->num_particles = 25;
 
     // use random std generator
     default_random_engine gen;
@@ -42,6 +42,7 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
         p.id = i, p.x=dist_x(gen), p.y=dist_y(gen), p.theta=dist_theta(gen);
         p.weight = 1.;
         this->particles.push_back(p);
+        weights.push_back(1.0);
     }
 
     this->is_initialized = true;
@@ -71,14 +72,14 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
         }
             
         //create normal Gaussian distribution for each particle
-        normal_distribution<double> dist_x(x, std_pos[0]);
-        normal_distribution<double> dist_y(y, std_pos[1]);
-        normal_distribution<double> dist_theta(theta, std_pos[2]);
+        normal_distribution<double> noise_x(0, std_pos[0]);
+        normal_distribution<double> noise_y(0, std_pos[1]);
+        normal_distribution<double> noise_theta(0, std_pos[2]);
 
         // add measurement back with noise TODO: add noise
-        particles[i].x = x; // dist_x(gen);
-        particles[i].y = y; //dist_y(gen);
-        particles[i].theta = theta; //dist_theta(gen);
+        particles[i].x = x + noise_x(gen);
+        particles[i].y = y + noise_y(gen);
+        particles[i].theta = theta + noise_theta(gen);
     }
 
 }
