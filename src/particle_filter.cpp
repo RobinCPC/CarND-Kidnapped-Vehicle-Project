@@ -125,31 +125,35 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
             double x_m = x_p + (cos(theta_p)*x_c) - (sin(theta_p) * y_c);
             double y_m = y_p + (sin(theta_p)*x_c) + (cos(theta_p) * y_c);
 
-            // TODO: rewrite with more simplier way (should get landmark index not id_i)
-            vector< pair<double, int>> dist_mark;
             // user nearest neighbor to find associations landmark in the map
-            for(auto mark : map_landmarks.landmark_list){
-                double distance = dist(x_m, y_m, mark.x_f, mark.y_f);
-                if (distance < sensor_range)
-                    dist_mark.push_back(make_pair(distance, mark.id_i));
+            vector<Map::single_landmark_s> ld_list = map_landmarks.landmark_list;
+            double min_dist = numeric_limits<double>::max();
+            int cls_mark_ind = -1; 
+            int assoc_id = -1;
+            for(size_t m = 0; m < ld_list.size(); ++m){                
+                double distance = dist(x_m, y_m, ld_list[m].x_f, ld_list[m].y_f);
+                if(distance < sensor_range &&  distance < min_dist){
+                    min_dist = distance;
+                    cls_mark_ind = m;
+                    assoc_id = ld_list[m].id_i;
+                }
             }
-            vector<pair<double, int>>::iterator res_it = std::min_element(dist_mark.begin(), dist_mark.end());
-            int cls_mark_id = dist_mark[ std::distance(dist_mark.begin(), res_it) ].second;
             
             // assign mark_id and sens_xy
-            assoc.push_back(cls_mark_id);
+            assoc.push_back(assoc_id);
             s_x.push_back(x_m);
             s_y.push_back(y_m);
             
             // calculate weight of each obs (Multivariable-Gaussian Probobility)
-            double mu_x = map_landmarks.landmark_list[cls_mark_id].x_f;
-            double mu_y = map_landmarks.landmark_list[cls_mark_id].y_f;
+            double mu_x = map_landmarks.landmark_list[cls_mark_ind].x_f;
+            double mu_y = map_landmarks.landmark_list[cls_mark_ind].y_f;
             double exponent = (pow(x_m - mu_x,2)) / (2 * pow(std_landmark[0],2)) + 
                               (pow(y_m - mu_y,2)) / (2 * pow(std_landmark[1],2));
             weight *= gauss_norm * exp(-exponent);
             
         }
         // update particle element (weight)
+        weights[i] = weight;
         particles[i].weight = weight;
         particles[i].associations = assoc;
         particles[i].sense_x = s_x;
@@ -162,28 +166,22 @@ void ParticleFilter::resample() {
 	// NOTE: You may find std::discrete_distribution helpful here.
 	//   http://en.cppreference.com/w/cpp/numeric/random/discrete_distribution
     double total_sum = 0.;
-    // clear weights
-    this->weights.empty();
-    for (auto p : particles)
-        total_sum += p.weight;
+    for (auto w : weights)
+        total_sum += w;
     std::vector<int> weights_list;
-    for(auto p : particles){
-        this->weights.push_back(p.weight);
-        weights_list.push_back( (int)(100*(p.weight)/total_sum) );
+    for(auto w : weights){
+        weights_list.push_back( (int)(100*w/total_sum) );
     }
 
-    // use random std generator
+    //// use random std generator
     default_random_engine gen;
-    //std::random_device rd;
-    //std::mt19937 gen(rd());
-
-    std::discrete_distribution<int> dis_d( weights.begin(), weights.end());
+    std::discrete_distribution<int> dis_d( weights_list.begin(), weights_list.end());
 
     vector<Particle> neo_ps;
-    for(int i = 0; i < this->num_particles; ++i){
+    for(int i = 0; i < num_particles; ++i){
         neo_ps.push_back( particles[dis_d(gen)] );
     }
-    this->particles = neo_ps;
+    particles = neo_ps;
 
 
 }
